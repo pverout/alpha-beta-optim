@@ -2,6 +2,13 @@ import yfinance as yf
 import statsmodels.api as sm
 import pandas as pd
 from data.portfolio import Portfolio
+import sys
+import os
+
+# Add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from data.portfolio import Portfolio
+
 
 class AlphaBeta:
     def __init__(self, benchmark_ticker="^GSPC", risk_free_rate=0.0138):
