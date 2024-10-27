@@ -40,6 +40,28 @@ class Portfolio:
         # Returns the annualized portfolio return and volatility
         return self.portfolio_return(), self.portfolio_volatility()
 
+    # def calc_portfolio_perf(weights, mean_returns, cov, rf):
+    # portfolio_return = np.sum(mean_returns * weights) * 252
+    # portfolio_std = np.sqrt(np.dot(weights.T, np.dot(cov, weights))) * np.sqrt(252)
+    # sharpe_ratio = (portfolio_return - rf) / portfolio_std
+    # return portfolio_return, portfolio_std, sharpe_ratio
+    # def simulate_random_portfolios(num_portfolios, mean_returns, cov, rf):
+    # results_matrix = np.zeros((len(mean_returns)+3, num_portfolios))
+    # for i in range(num_portfolios):
+    #     weights = np.random.random(len(mean_returns))
+    #     weights /= np.sum(weights)
+    #     portfolio_return, portfolio_std, sharpe_ratio = calc_portfolio_perf(weights, mean_returns, cov, rf)
+    #     results_matrix[0,i] = portfolio_return
+    #     results_matrix[1,i] = portfolio_std
+    #     results_matrix[2,i] = sharpe_ratio
+    #     #iterate through the weight vector and add data to results array
+    #     for j in range(len(weights)):
+    #         results_matrix[j+3,i] = weights[j]
+            
+    # results_df = pd.DataFrame(results_matrix.T,columns=['ret','stdev','sharpe'] + [ticker for ticker in tickers])
+        
+    # return results_df
+
 if __name__ == "__main__":
     # Example Usage
     tickers = ["AAPL", "MSFT", "GOOGL", "AMZN"]
@@ -48,6 +70,7 @@ if __name__ == "__main__":
     end_date = "2021-01-01"
 
     portfolio = Portfolio(tickers, weights, start_date, end_date)
+    print(portfolio.returns)
     annual_return, annual_volatility = portfolio.portfolio_performance()
 
     print(f"Annual Portfolio Return: {annual_return:.2%}")
