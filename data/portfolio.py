@@ -1,77 +1,139 @@
 import yfinance as yf
 import pandas as pd
 import numpy as np
+import statsmodels.api as sm
 
 class Portfolio:
-    def __init__(self, tickers, weights, start, end):
+    def __init__(self, data_in, tickers, weights, start, end,risk_free_rate):
         # Ensure weights sum to 1
-        if sum(weights) != 1:
+        if np.round(sum(weights),2) != 1:
             raise ValueError("Weights must sum to 1.")
         self.tickers = tickers
         self.weights = weights
         self.start = start
         self.end = end
-        self.data = self._download_data()
-        self.returns = self._calculate_returns()
+        self.risk_free_rate = risk_free_rate
 
-    def _download_data(self):
-        # Download adjusted close prices for the given tickers and date range
-        data = yf.download(self.tickers, start=self.start, end=self.end)["Adj Close"]
-        return data
+        self.data = data_in['Adj Close'][self.tickers].loc[start:end]
+        self.returns = self._calculate_return()
+        self.stdev = self._calculate_stdev()
+        self.mean_return = self.calculate_mean_returns()
 
-    def _calculate_returns(self):
+    def _calculate_return(self):
         # Calculate daily returns for each stock
         returns = self.data.pct_change().dropna()
         return returns
 
-    def portfolio_return(self):
+    def calculate_mean_returns(self, weights=None):
         # Calculate the weighted portfolio return
-        weighted_returns = (self.returns * self.weights).sum(axis=1)
-        portfolio_return = weighted_returns.mean() * 252  # Annualized return
-        return portfolio_return
+        if weights is None:
+            weights = self.weights  # Use the class variable if no weights are provided
+        returns = (self.returns * weights).sum(axis=1)
+        returns = returns.mean() * 252  # Annualized return
+        return returns
 
-    def portfolio_volatility(self):
-        # Calculate the portfolio volatility
-        weighted_cov_matrix = np.dot(self.weights, np.dot(self.returns.cov() * 252, self.weights))
-        portfolio_volatility = np.sqrt(weighted_cov_matrix)
-        return portfolio_volatility
+    def _calculate_stdev(self, weights=None):
+        # Calculate the portfolio standard deviation
+        if weights is None:
+            weights = self.weights  # Use the class variable if no weights are provided
+        stdev = np.sqrt(np.dot(weights, np.dot(self.returns.cov() * 252, weights)))
+        return stdev
 
-    def portfolio_performance(self):
-        # Returns the annualized portfolio return and volatility
-        return self.portfolio_return(), self.portfolio_volatility()
+    def portfolio_shape(self, weights=None):
+        # Calculate the Sharpe ratio
+        if weights is None:
+            weights = self.weights  # Use the class variable if no weights are provided
+        mean_return = self.calculate_mean_returns(weights)
+        stdev = self._calculate_stdev(weights)
+        shape = (mean_return - self.risk_free_rate) / stdev
+        return shape
 
-    # def calc_portfolio_perf(weights, mean_returns, cov, rf):
-    # portfolio_return = np.sum(mean_returns * weights) * 252
-    # portfolio_std = np.sqrt(np.dot(weights.T, np.dot(cov, weights))) * np.sqrt(252)
-    # sharpe_ratio = (portfolio_return - rf) / portfolio_std
-    # return portfolio_return, portfolio_std, sharpe_ratio
-    # def simulate_random_portfolios(num_portfolios, mean_returns, cov, rf):
-    # results_matrix = np.zeros((len(mean_returns)+3, num_portfolios))
-    # for i in range(num_portfolios):
-    #     weights = np.random.random(len(mean_returns))
-    #     weights /= np.sum(weights)
-    #     portfolio_return, portfolio_std, sharpe_ratio = calc_portfolio_perf(weights, mean_returns, cov, rf)
-    #     results_matrix[0,i] = portfolio_return
-    #     results_matrix[1,i] = portfolio_std
-    #     results_matrix[2,i] = sharpe_ratio
-    #     #iterate through the weight vector and add data to results array
-    #     for j in range(len(weights)):
-    #         results_matrix[j+3,i] = weights[j]
-            
-    # results_df = pd.DataFrame(results_matrix.T,columns=['ret','stdev','sharpe'] + [ticker for ticker in tickers])
-        
-    # return results_df
+    def portfolio_VaR(self, alpha=0.05, weights=None):
+        # Calculate the portfolio returns
+        if weights is None:
+            weights = self.weights  # Use the class variable if no weights are provided
+
+        # Simulate portfolio returns using the covariance matrix
+        port_returns = np.dot(self.returns, weights)
+        # Calculate VaR
+        var = np.abs(np.percentile(port_returns, 100 * alpha))
+        return var
+
+    def portfolio_CVaR(self, alpha=0.05, weights=None):
+        # Calculate the portfolio returns
+        if weights is None:
+            weights = self.weights  # Use the class variable if no weights are provided
+
+        # Simulate portfolio returns using the covariance matrix
+        port_returns = np.dot(self.returns, weights)
+
+        # Calculate VaR
+        var = np.percentile(port_returns, 100 * alpha)
+
+        # Calculate CVaR (average of returns that are worse than VaR)
+        cvar = np.abs(port_returns[port_returns <= var].mean())
+        return cvar
+
+
+    def portfolio_shape_VaR(self, alpha=0.05, weights=None):
+        # Calculate the portfolio returns
+        if weights is None:
+            weights = self.weights  # Use the class variable if no weights are provided
+
+        # Simulate portfolio returns using the covariance matrix
+        port_returns = np.dot(self.returns, weights)
+        mean_return = self.calculate_mean_returns(weights)
+
+        var = np.abs(np.percentile(port_returns, 100 * alpha))
+        shape_VaR = (mean_return - self.risk_free_rate)/var
+        return shape_VaR
+
+
+    def portfolio_shape_CVaR(self, alpha=0.05, weights=None):
+        # Calculate the portfolio returns
+        if weights is None:
+            weights = self.weights  # Use the class variable if no weights are provided
+
+        # Simulate portfolio returns using the covariance matrix
+        port_returns = np.dot(self.returns, weights)
+        mean_return = self.calculate_mean_returns(weights)
+        # Calculate VaR
+        var = np.percentile(port_returns, 100 * alpha)
+
+        # Calculate CVaR (average of returns that are worse than VaR)
+        cvar = np.abs(port_returns[port_returns <= var].mean())
+        shape_CVaR = (mean_return - self.risk_free_rate)/cvar
+        return shape_CVaR
+
+
+    def portfolio_performance(self, alpha = 0.05, weights=None):
+        # Returns the annualized portfolio return and standard deviation
+        mean_return = self.calculate_mean_returns(weights)
+        stdev = self._calculate_stdev(weights)
+        shape = self.portfolio_shape(weights)
+        vaR = self.portfolio_VaR(alpha = alpha, weights = weights)
+        cvaR = self.portfolio_CVaR(alpha = alpha, weights = weights)
+        return mean_return, stdev, shape, vaR, cvaR
+
 
 if __name__ == "__main__":
     # Example Usage
-    tickers = ["AAPL", "MSFT", "GOOGL", "AMZN"]
-    weights = [0.3, 0.2, 0.3, 0.2]  # Adjust these as long as they sum to 1
+    tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "JNJ", "PFE", "VZ", "T", "KO", "SPY", "META", "NVDA", "JD", "CORT", "PRA"]
     start_date = "2013-12-31"
     end_date = "2021-01-01"
+    dfport = yf.download(tickers, start_date, end_date)
+        
+    date_filter_start = "2019-01-01"
+    date_filter_end = "2023-12-31"
+    tickers1 = ["JD", "AAPL", "META", "NVDA", "AMZN"]
+    weigths = [1/len(tickers1)]*len(tickers1)
+    portfolio = Portfolio(data_in = dfport, tickers = tickers1, weights = weigths, start = date_filter_start, end = date_filter_end, risk_free_rate = 0.01)
 
-    portfolio = Portfolio(tickers, weights, start_date, end_date)
-    print(portfolio.returns)
-    annual_return, annual_volatility = portfolio.portfolio_performance()
+    print(portfolio.returns.corr())
+    #annual_return, annual_stdev, shape = portfolio.portfolio_performance()
+    alpha, beta =  portfolio.calculate_alpha_beta("^GSPC")
 
     print(f"Annual Portfolio Return: {annual_return:.2%}")
-    print(f"Annual Portfolio Volatility: {annual_volatility:.2%}")
+    print(f"Annual Portfolio Stdev: {annual_stdev:.2%}")
+    print(f"alpha: {alpha: 3f}")
+    print(f"beta: {beta: 3f}")

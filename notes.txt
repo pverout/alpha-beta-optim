@@ -1,0 +1,10 @@
+TODO
+- Only import yf.dowloard once
+- implement portfolio VAR metric and shapley
+- plot over vAR
+- plot over variance (change name) find shapley
+
+
+- Optimizing for portfolio to minimize shapley
+- Optimizing for portfolio minizing CVAR
+
